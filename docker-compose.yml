@@ -14,6 +14,7 @@ services:
     depends_on:
       - rag-service
     volumes:
+      - /data/paperless-ai/data:/app/data
       - /data/paperless-ai/config:/app/data/config
       - /data/paperless-ai/db:/app/data/db
       - /data/paperless-ai/models:/app/data/models
