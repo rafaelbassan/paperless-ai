@@ -1,23 +1,28 @@
+version: "3.9"
+
 services:
   paperless-ai:
-    image: clusterzx/paperless-ai
-    container_name: paperless-ai
-    network_mode: bridge
+    image: ghcr.io/clusterzx/paperless-ai:latest
     restart: unless-stopped
-    cap_drop:
-      - ALL
-    security_opt:
-      - no-new-privileges=true
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - PAPERLESS_AI_PORT=${PAPERLESS_AI_PORT:-3000}
-      - RAG_SERVICE_URL=http://localhost:8000
-      - RAG_SERVICE_ENABLED=true
     ports:
-      - "3000:${PAPERLESS_AI_PORT:-3000}"
+      - "3000:3000"
+    environment:
+      - PAPERLESS_AI_PORT=3000
+      - RAG_SERVICE_URL=http://rag-service:8000
+    depends_on:
+      - rag-service
     volumes:
-      - paperless-ai_data:/app/data
+      - /data/paperless-ai/config:/app/data/config
+      - /data/paperless-ai/db:/app/data/db
+      - /data/paperless-ai/models:/app/data/models
+      - /data/paperless-ai/uploads:/app/data/uploads
 
-volumes:
-  paperless-ai_data:
+  rag-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.rag
+    restart: unless-stopped
+    expose:
+      - "8000"
+    volumes:
+      - /data/paperless-ai/db:/app/data/db
