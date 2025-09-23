@@ -58,9 +58,10 @@ class RagService {
       
       const { context, sources } = response.data;
       
-      // 2. Check if any source documents have the "Referência" tag
+      // 2. Check if any source documents have the "Referência" tag and collect metadata
       let hasReferenceTag = false;
       let sourceInfo = '';
+      let referenceDocuments = [];
       
       if (sources && sources.length > 0) {
         await paperlessService.ensureTagCache();
@@ -78,6 +79,15 @@ class RagService {
                 
                 if (tagNames.includes('Referência')) {
                   hasReferenceTag = true;
+                  // Collect detailed metadata for citation
+                  referenceDocuments.push({
+                    id: source.doc_id,
+                    title: document.title || source.title || 'Unknown Title',
+                    created: document.created_date || document.created,
+                    correspondent: document.correspondent_name || document.correspondent,
+                    tags: tagNames,
+                    content: document.content ? document.content.substring(0, 500) + '...' : ''
+                  });
                 }
                 
                 // Build source info for prompt
@@ -119,8 +129,16 @@ class RagService {
       
       // Create a language-agnostic prompt that works in any language
       let citationInstruction = '';
-      if (hasReferenceTag) {
-        citationInstruction = '- Since some documents have the "Referência" tag, include citations to the sources in your answer using the format <citation>Document Title</citation>';
+      let referenceInfo = '';
+      
+      if (hasReferenceTag && referenceDocuments.length > 0) {
+        citationInstruction = `- Since some documents have the "Referência" tag, include citations to the sources in your answer using the format <citation>AUTHORS. Title. Journal/Publication. v.Volume, p.Pages, Year.</citation>
+        Example: <citation>MADUREIRA, F., COLLEGA, D. G., RODRIGUES, H. F., OLIVEIRA, T. A. C., FREUDENHEIM, A. M. Validação de um Instrumento para Avaliação Qualitativa do Nado "Crawl". Revista Brasileira de Educação Física e Esporte. v.22, p.273-284, 2008.</citation>
+        Use the document title and available metadata to format the citation appropriately.`;
+        
+        referenceInfo = '\n\nReference Documents Metadata:\n' + referenceDocuments.map(doc => 
+          `ID: ${doc.id}\nTitle: ${doc.title}\nCreated: ${doc.created}\nCorrespondent: ${doc.correspondent}\nTags: ${doc.tags.join(', ')}\nExcerpt: ${doc.content}`
+        ).join('\n\n');
       } else {
         citationInstruction = '- Do not mention document numbers or source references, answer as if it were a natural conversation';
       }
@@ -136,7 +154,7 @@ class RagService {
         ${enhancedContext}
 
         Source information:
-        ${sourceInfo}
+        ${sourceInfo}${referenceInfo}
 
         Important instructions:
         - Use ONLY information from the provided documents
