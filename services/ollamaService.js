@@ -681,7 +681,7 @@ class OllamaService {
      * @param {string} prompt - The prompt to generate text from
      * @returns {Promise<string>} - The generated text
      */
-    async generateText(prompt) {
+    async generateText(prompt, options = {}) {
         try {
             // Calculate context window size based on prompt length
             const promptTokenCount = this._calculatePromptTokenCount(prompt);
@@ -690,6 +690,8 @@ class OllamaService {
             // Simple system prompt for text generation
             const systemPrompt = `You are a helpful assistant. Generate a clear, concise, and informative response to the user's question or request.`;
 
+            const temperature = options.temperature || parseFloat(process.env.RAG_TEMPERATURE) || 0.1;
+
             // Call Ollama API without enforcing a specific response format
             const response = await this.client.post(`${this.apiUrl}/api/generate`, {
                 model: this.model,
@@ -697,7 +699,7 @@ class OllamaService {
                 system: systemPrompt,
                 stream: false,
                 options: {
-                    temperature: 0.7,
+                    temperature: temperature,
                     top_p: 0.9,
                     num_predict: 1024,
                     num_ctx: numCtx

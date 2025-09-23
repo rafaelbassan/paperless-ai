@@ -357,7 +357,7 @@ class AzureOpenAIService {
    * @param {string} prompt - The prompt to generate text from
    * @returns {Promise<string>} - The generated text
    */
-  async generateText(prompt) {
+  async generateText(prompt, options = {}) {
     try {
       this.initialize();
 
@@ -366,6 +366,7 @@ class AzureOpenAIService {
       }
 
       const model = process.env.AZURE_DEPLOYMENT_NAME;
+      const temperature = options.temperature || parseFloat(process.env.RAG_TEMPERATURE) || 0.1;
 
       const response = await this.client.chat.completions.create({
         model: model,
@@ -375,7 +376,7 @@ class AzureOpenAIService {
             content: prompt
           }
         ],
-        temperature: 0.7,
+        temperature: temperature,
         max_tokens: 1000
       });
 
