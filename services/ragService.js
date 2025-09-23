@@ -143,6 +143,8 @@ class RagService {
         - If the answer is not contained in the documents, respond: "This information is not contained in the documents." (in the same language as the question)
         - Avoid assumptions or speculation beyond the given context
         - Answer in the same language as the question was asked
+        - Before providing your final answer, double-check that all information comes directly from the documents and is accurate
+        - If you're unsure about any part of the answer, either omit it or clearly state the uncertainty
         ${citationInstruction}
         `;
 
