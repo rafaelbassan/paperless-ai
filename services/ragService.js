@@ -48,11 +48,6 @@ class RagService {
     }
   }
 
-  /**
-   * Ask a question about documents and get an AI-generated answer in the same language as the question
-   * @param {string} question - The question to ask
-   * @returns {Promise<{answer: string, sources: Array}>} - AI response and source documents
-   */
   async askQuestion(question) {
     try {
       // 1. Get context from the RAG service
@@ -63,7 +58,39 @@ class RagService {
       
       const { context, sources } = response.data;
       
-      // 2. Fetch full content for each source document using doc_id
+      // 2. Check if any source documents have the "Referência" tag
+      let hasReferenceTag = false;
+      let sourceInfo = '';
+      
+      if (sources && sources.length > 0) {
+        await paperlessService.ensureTagCache();
+        
+        for (const source of sources) {
+          if (source.doc_id) {
+            try {
+              const document = await paperlessService.getDocument(source.doc_id);
+              if (document.tags && Array.isArray(document.tags)) {
+                // Resolve tag names
+                const tagNames = document.tags.map(tagId => {
+                  const tag = Array.from(paperlessService.tagCache.values()).find(t => t.id === tagId);
+                  return tag ? tag.name : null;
+                }).filter(name => name);
+                
+                if (tagNames.includes('Referência')) {
+                  hasReferenceTag = true;
+                }
+                
+                // Build source info for prompt
+                sourceInfo += `Document: ${source.title || 'Document ' + source.doc_id}, Tags: ${tagNames.join(', ')}\n`;
+              }
+            } catch (error) {
+              console.error(`Error fetching document metadata for ${source.doc_id}:`, error.message);
+            }
+          }
+        }
+      }
+      
+      // 3. Fetch full content for each source document using doc_id
       let enhancedContext = context;
       
       if (sources && sources.length > 0) {
@@ -87,10 +114,17 @@ class RagService {
         enhancedContext = context + '\n\n' + fullDocContents.filter(content => content).join('\n\n');
       }
       
-      // 3. Use AI service to generate an answer based on the enhanced context
+      // 4. Use AI service to generate an answer based on the enhanced context
       const aiService = AIServiceFactory.getService();
       
       // Create a language-agnostic prompt that works in any language
+      let citationInstruction = '';
+      if (hasReferenceTag) {
+        citationInstruction = '- Since some documents have the "Referência" tag, include citations to the sources in your answer using the format <citation>Document Title</citation>';
+      } else {
+        citationInstruction = '- Do not mention document numbers or source references, answer as if it were a natural conversation';
+      }
+      
       const prompt = `
         You are a helpful assistant that answers questions about documents.
 
@@ -101,12 +135,15 @@ class RagService {
         Context from relevant documents:
         ${enhancedContext}
 
+        Source information:
+        ${sourceInfo}
+
         Important instructions:
         - Use ONLY information from the provided documents
         - If the answer is not contained in the documents, respond: "This information is not contained in the documents." (in the same language as the question)
         - Avoid assumptions or speculation beyond the given context
         - Answer in the same language as the question was asked
-        - Do not mention document numbers or source references, answer as if it were a natural conversation
+        ${citationInstruction}
         `;
 
       let answer;
